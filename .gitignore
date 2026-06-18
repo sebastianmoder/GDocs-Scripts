@@ -1,1 +1,41 @@
+# macOS and local filesystem metadata
 .DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+
+# Editor and IDE state
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Logs and temporary files
+*.log
+logs/
+tmp/
+temp/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# Google Apps Script / clasp local files
+.clasprc.json
+.clasp.json
+
+# Optional Node tooling for clasp or local checks
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build, coverage, and cache output
+dist/
+build/
+coverage/
+.cache/
