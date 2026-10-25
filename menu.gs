@@ -6,7 +6,7 @@ function onOpen() {
 
     // .addItem("Count words by heading", "showHeadingWordCounts")
     // .addItem("Tidy APA statistical notation", "tidyApaStatNotation")
-    // .addItem("Highlight parenthetical citations", "highlightParentheticalCitations")
+    // .addItem("Highlight references…", "showHighlightOptions")
 
     .addToUi();
 }

@@ -14,7 +14,7 @@ All `.addItem(...)` lines are commented out by default. Uncomment the line for e
 
 - `Count words by heading` runs `showHeadingWordCounts` from `showHeadingWordCounts.gs`.
 - `Tidy APA statistical notation` runs `tidyApaStatNotation` from `tidyApaStatNotation.gs`.
-- `Highlight parenthetical citations` runs `highlightParentheticalCitations` from `highlightCitations.gs`.
+- `Highlight references…` runs `showHighlightOptions` from `highlightCitations.gs`.
 
 Save the project and reload the Google Doc to display the enabled menu items. Keep only one `onOpen()` function in the project; if you already have one, merge the menu setup into it. You can also run any utility directly from the Apps Script editor without importing the menu template.
 
@@ -47,13 +47,47 @@ Counts use a preview with all suggestions accepted. The script never changes the
 
 ### `highlightCitations.gs`
 
-Run `highlightParentheticalCitations` to highlight matching parenthetical passages in pale yellow (`#FFF3B0`) and display the number of passages highlighted. It processes only the active tab's body, including ordinary table text, and does not require the advanced Google Docs API service.
+Run `showHighlightOptions` to open a dialog with three independently selectable categories. Citations are selected initially. The highlighter, dialog HTML, and all helpers are contained in **one `.gs` file**: you can paste only `highlightCitations.gs` into a document-bound project and run it from the editor. The menu template is optional. No advanced Google Docs API service is required.
 
-A passage matches if it contains a year from 1900 to 2099, optionally followed by a letter, or a no-date marker such as `n.d.` or `n. d.`. Matching is case-insensitive. Examples include `(Smith, 2020)`, `(Smith et al., 2020a)`, and `(Smith, 2020; Jones, n.d.)`. The entire passage, including parentheses, is highlighted and counted once, even if it contains multiple sources.
+| Category | Color | Examples |
+| --- | --- | --- |
+| Citations | Pale yellow `#FFF3B0` | `(Smith, 2020)`, `(Jones, n. d.)` |
+| Materials | Pale blue `#B8E8FF` | `Table 1a`, `Figure S3a`, `Appendix 2`, `Supplementary Material` |
+| Page numbers | Pale pink `#FFD1E8` | `(p. 12)`, `[p. 12]`, `p.[12]`, `pp. iv–vi` |
 
-This is a date-based heuristic: passages such as `(the project began in 2020)` also match. It skips passages without a qualifying date, square-bracket citations, and passages spanning paragraph breaks. With nested parentheses, only qualifying inner passages match.
+These three distinct colors were checked against `avoidcolors.csv`; none appears in that file. Colors are configured in `REFERENCE_HIGHLIGHT_COLORS` at the top of the script. The CSV is a development reference and does not need to be uploaded to Apps Script.
 
-Run it on a duplicate manuscript first. Matching passages have their existing background colors overwritten; other formatting is preserved. The script does not clear existing highlights when rerun.
+**Citations:** A parenthetical passage matches if it contains a year from 1900 to 2099, optionally followed by a letter, or `n.d.` / `n. d.`. The entire passage, including parentheses, is highlighted and counted once, even with multiple sources. This retains the original date-based heuristic: `(the project began in 2020)` also matches. Square-bracket citations and passages spanning paragraph breaks are skipped. With nested parentheses, only qualifying inner passages match. The original `highlightParentheticalCitations` function remains available for citation-only runs and existing menus.
+
+**Materials:** Case-insensitive matching covers Table(s), Figure(s), Appendix/Appendices, `Tab./Tabs.`, `Fig./Figs.`, `App.`, and Supplemental/Supplementary Material(s). Parentheses are not required. Identifiers can be Arabic numbers, letters, S-prefixed numbers, or identifiers such as `A1`, with panel suffixes such as `1a`, `S3a`, or `2(a)`. Lists and ranges include `Tables 1 and 2`, `Figures 1a, 2b, and S3c`, `Figures 1a–c`, `Figures 1 and Figure 2`, and `Appendices A–C` or `Appendices 1–3`. Supplemental/Supplementary Material(s) also matches without an identifier; other labels require one. The label and reference sequence are highlighted, excluding surrounding parentheses and sentence punctuation.
+
+**Pages:** A `p.` or `pp.` label is required, case-insensitively. Optional spaces, including nonbreaking spaces, are accepted: `p.12`, `p. 12`, `[p. 12]`, `p. [12]`, `pp. [12–15]`, and `(p. 12)` all match. Arabic and valid Roman numerals, comma/conjunction lists, repeated labels, and hyphen/en-dash/em-dash ranges are supported. Balanced brackets or parentheses are included when they enclose only the locator; `(see p. 12)` highlights just `p. 12`. Bare numbers and years do not match. Symbolic placeholders such as `p. x` are interpreted as Roman numerals when valid; `[x]` without a page label is skipped.
+
+The dialog reports matches found for each selected category. Each complete list/range counts as one match; counts are occurrences found, not newly changed highlights. If categories overlap, citation color takes priority: `(Smith, 2020, p. 12)` remains entirely yellow when both Citations and Page numbers are selected. Materials take priority over pages in any remaining overlap. Counts still include matches covered by a higher-priority category. With only Page numbers selected, the same passage highlights just `p. 12`.
+
+Processing is restricted to the active tab's body, including ordinary table text. Headers, footers, footnotes, other tabs, and non-text objects are not processed. Matches do not cross paragraph boundaries. Matching uses textual patterns rather than validating references against captions or a bibliography, so a matching caption or generic phrase such as `Appendix A` can also be highlighted.
+
+Run it on a duplicate manuscript first. Only backgrounds within matches are overwritten; text, italics, bold, links, superscripts, and other formatting are preserved. Reruns do not clear existing highlights, including highlights from a previously selected category. Use Google Docs Undo to revert a run.
+
+#### Highlighter validation
+
+Local checks exercise exact matching offsets, exclusions, all seven category combinations, overlap priority, color exclusions, mocked background-only writes, repeat runs, legacy entry-point behavior, and dialog submission/success/failure handling. These checks do not replace validation in Google Docs.
+
+For manual validation, paste a mixed-format sample into a duplicate Google Doc and record expected and observed results:
+
+| Scenario | Expected result |
+| --- | --- |
+| `(Smith, 2020, p. 12; see Figure S3a)` with all categories selected | One match per category; whole passage yellow |
+| Same passage with Materials and Page numbers only | `Figure S3a` blue and `p. 12` pink |
+| `Tables 1a–c; Appendices 1–3; Supplementary Material` | Three blue material matches |
+| `(p. 12); [p. 12]; p.[12]; pp. iv–vi` | Four pink page matches, including their wrappers |
+| Bold/italic/link/superscript text within a reference | Background changes; original formatting and text remain |
+| References in a table and in two document tabs | Active tab's body/table matches change; other tab remains unchanged |
+| No selected categories, then a run with no matching text | Empty selection rejected; no-match run reports zero |
+| Repeat a run, then select a different category | Counts repeat; previous highlights remain |
+| Authorization or server failure | Error appears in the dialog; Highlight becomes available again |
+
+Live Google Docs results have not been recorded in this checkout; there is no configured document-bound deployment target.
 
 ## Typical Use
 
