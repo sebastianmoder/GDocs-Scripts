@@ -69,6 +69,8 @@ Processing is restricted to the active tab's body, including ordinary table text
 
 Run it on a duplicate manuscript first. Only backgrounds within matches are overwritten; text, italics, bold, links, superscripts, and other formatting are preserved. Reruns do not clear existing highlights, including highlights from a previously selected category. Use Google Docs Undo to revert a run.
 
+To remove highlights, select the categories to clear and click the red **Clear highlights** button in the same dialog. It scans background colors in the current tab's body, including tables, independently of reference matching, so edited text is cleared too. All instances of the selected colors are removed, including manually applied identical colors. Other background colors and text formatting remain unchanged. Clearing removes the background; it cannot restore an earlier background overwritten by highlighting. Its counts represent contiguous spans of each color cleared, rather than reference matches. Highlight and Clear highlights are both disabled while either action is running.
+
 #### Highlighter validation
 
 Local checks exercise exact matching offsets, exclusions, all seven category combinations, overlap priority, color exclusions, mocked background-only writes, repeat runs, legacy entry-point behavior, and dialog submission/success/failure handling. These checks do not replace validation in Google Docs.
@@ -85,7 +87,10 @@ For manual validation, paste a mixed-format sample into a duplicate Google Doc a
 | References in a table and in two document tabs | Active tab's body/table matches change; other tab remains unchanged |
 | No selected categories, then a run with no matching text | Empty selection rejected; no-match run reports zero |
 | Repeat a run, then select a different category | Counts repeat; previous highlights remain |
-| Authorization or server failure | Error appears in the dialog; Highlight becomes available again |
+| Select Materials and click Clear highlights after editing highlighted text | All blue spans in the active tab's body are cleared; other colors remain |
+| Clear a span split by bold/italic/link formatting | Entire matching color span is cleared; original formatting remains |
+| Clear again, or clear an empty tab | Zero spans cleared; other tabs remain unchanged |
+| Authorization or server failure | Error appears in the dialog; both action buttons become available again |
 
 Live Google Docs results have not been recorded in this checkout; there is no configured document-bound deployment target.
 

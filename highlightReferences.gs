@@ -3,7 +3,8 @@
 * Everything, including the dialog, lives in this one document-bound script.
 * Only the active tab's body (including table text) is processed. Existing
 * backgrounds within matches are overwritten; text and other attributes remain.
-* Citation matches take color priority. Reruns do not clear old highlights.
+* Citation matches take color priority. Highlighting does not clear old colors;
+* Clear highlights removes selected category colors without matching the text.
 */
 const REFERENCE_HIGHLIGHT_COLORS = {
     citations: '#FFF3B0',
@@ -23,6 +24,9 @@ function highlightReferences() {
         border: 1px solid #777; vertical-align: middle; margin: 0 5px; }
         p { line-height: 1.5; }
         button { padding: 8px 16px; margin-right: 8px; cursor: pointer; }
+        #clear { background: #b3261e; color: #fff; border: 1px solid #b3261e; }
+        #clear:hover:not(:disabled) { background: #8c1d18; }
+        button:disabled { opacity: 0.55; cursor: default; }
         #status { white-space: pre-line; }
     </style></head><body>
         <p>Highlight references in the active tab, including tables.</p>
@@ -38,42 +42,55 @@ function highlightReferences() {
                 <small>p.12; [p. 12]; p. [12]; pp. iv–vi</small></label>
             <p>Only backgrounds inside matches change. Existing highlights elsewhere
                 remain. Citation color wins when selected categories overlap.</p>
+            <p>Clearing removes all highlights using the selected categories’ colors,
+                including manually applied identical colors.</p>
             <button id="run" type="submit">Highlight</button>
+            <button id="clear" type="button">Clear highlights</button>
             <button type="button" onclick="google.script.host.close()">Close</button>
         </form>
         <p id="status" role="status" aria-live="polite"></p>
         <script>
             document.getElementById('options').addEventListener('submit', function(event) {
                 event.preventDefault();
+                runAction(false);
+            });
+            document.getElementById('clear').addEventListener('click', function() {
+                runAction(true);
+            });
+            function runAction(clearing) {
                 var options = {};
                 ['citations', 'materials', 'pages'].forEach(function(key) {
-            options[key] = document.getElementById(key).checked;
-            });
-            var status = document.getElementById('status');
-            var button = document.getElementById('run');
-            if (!options.citations && !options.materials && !options.pages) {
-                status.textContent = 'Select at least one category.';
-                return;
-            }
-            button.disabled = true;
-            status.textContent = 'Highlighting…';
-            google.script.run.withSuccessHandler(function(result) {
-                button.disabled = false;
-                var labels = {citations: 'Citations', materials: 'Materials', pages: 'Page numbers'};
-                var lines = ['Matches found:'];
-                Object.keys(labels).forEach(function(key) {
-                    if (options[key]) lines.push(labels[key] + ': ' + result.counts[key]);
+                    options[key] = document.getElementById(key).checked;
                 });
-                lines.push('Overlapping matches can share highlighted text.');
-                status.textContent = lines.join('\\n');
+                var status = document.getElementById('status');
+                var button = document.getElementById('run');
+                var clearButton = document.getElementById('clear');
+                if (button.disabled || clearButton.disabled) return;
+                if (!options.citations && !options.materials && !options.pages) {
+                    status.textContent = 'Select at least one category.';
+                    return;
+                }
+                button.disabled = clearButton.disabled = true;
+                status.textContent = clearing ? 'Clearing highlights…' : 'Highlighting…';
+                var runner = google.script.run.withSuccessHandler(function(result) {
+                    button.disabled = clearButton.disabled = false;
+                    var labels = {citations: 'Citations', materials: 'Materials', pages: 'Page numbers'};
+                    var lines = [clearing ? 'Highlight spans cleared:' : 'Matches found:'];
+                    Object.keys(labels).forEach(function(key) {
+                        if (options[key]) lines.push(labels[key] + ': ' + result.counts[key]);
+                    });
+                    if (!clearing) lines.push('Overlapping matches can share highlighted text.');
+                    status.textContent = lines.join('\\n');
                 }).withFailureHandler(function(error) {
-                    button.disabled = false;
-                    status.textContent = 'Highlighting failed: ' + error.message;
-                }).highlightSelectedReferences(options);
-            });
+                    button.disabled = clearButton.disabled = false;
+                    status.textContent = (clearing ? 'Clearing failed: ' : 'Highlighting failed: ') + error.message;
+                });
+                if (clearing) runner.clearSelectedReferenceHighlights(options);
+                else runner.highlightSelectedReferences(options);
+            }
         </script>
     </body></html>
-    `).setWidth(480).setHeight(510);
+    `).setWidth(480).setHeight(580);
         DocumentApp.getUi().showModalDialog(html, 'Highlight references');
     }
     
@@ -87,18 +104,8 @@ function highlightReferences() {
     }
     
     function highlightSelectedReferences(options) {
-        const categories = Object.keys(REFERENCE_HIGHLIGHT_COLORS).filter(function(key) {
-            return options && options[key] === true;
-        });
-        if (!categories.length) {
-            throw new Error('Select at least one category.');
-        }
-        const doc = DocumentApp.getActiveDocument();
-        const tab = doc && doc.getActiveTab();
-        if (!tab) {
-            throw new Error('Run this script from your Google Doc via Extensions → Apps Script.');
-        }
-        const textElement = tab.asDocumentTab().getBody().editAsText();
+        const categories = selectedReferenceCategories_(options);
+        const textElement = activeReferenceText_();
         const result = findReferenceHighlights_(textElement.getText(), categories);
         result.ranges.forEach(function(range) {
             // Match offsets are half-open; DocumentApp's end offset is inclusive.
@@ -107,6 +114,59 @@ function highlightReferences() {
             });
             return { counts: result.counts };
         }
+
+// Clear by color, even when highlighted text no longer matches a reference.
+function clearSelectedReferenceHighlights(options) {
+  const categories = selectedReferenceCategories_(options);
+  const textElement = activeReferenceText_();
+  const textLength = textElement.getText().length;
+  const counts = { citations: 0, materials: 0, pages: 0 };
+  if (!textLength) return { counts: counts };
+
+  const categoryByColor = {};
+  categories.forEach(function(category) {
+    categoryByColor[REFERENCE_HIGHLIGHT_COLORS[category].toUpperCase()] = category;
+  });
+  const indices = textElement.getTextAttributeIndices();
+  const ranges = [];
+  // Capture runs before editing. Bold/links/etc. can split one color span.
+  indices.forEach(function(start, index) {
+    const end = index + 1 < indices.length ? indices[index + 1] : textLength;
+    if (start >= end) return;
+    const color = textElement.getBackgroundColor(start);
+    const category = color && categoryByColor[color.toUpperCase()];
+    if (!category) return;
+    const previous = ranges[ranges.length - 1];
+    if (previous && previous.end === start && previous.category === category) {
+      previous.end = end;
+    } else {
+      ranges.push({ start: start, end: end, category: category });
+    }
+  });
+  ranges.forEach(function(range) {
+    // null removes the background rather than painting it white.
+    textElement.setBackgroundColor(range.start, range.end - 1, null);
+    counts[range.category]++;
+  });
+  return { counts: counts };
+}
+
+function selectedReferenceCategories_(options) {
+  const categories = Object.keys(REFERENCE_HIGHLIGHT_COLORS).filter(function(key) {
+    return options && options[key] === true;
+  });
+  if (!categories.length) throw new Error('Select at least one category.');
+  return categories;
+}
+
+function activeReferenceText_() {
+  const doc = DocumentApp.getActiveDocument();
+  const tab = doc && doc.getActiveTab();
+  if (!tab) {
+    throw new Error('Run this script from your Google Doc via Extensions → Apps Script.');
+  }
+  return tab.asDocumentTab().getBody().editAsText();
+}
         
         function findReferenceHighlights_(text, categories) {
             const finders = {
