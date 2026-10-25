@@ -26,6 +26,7 @@ The script is designed for APA 7 statistical notation cleanup in manuscript draf
 - converts `>=` and `<=` to APA-friendly comparison symbols
 - converts hyphen-minus signs in negative numbers to true minus signs
 - formats common statistics such as `R2`, chi-squared, and partial eta squared
+- converts every `²` glyph in processed body text to a regular `2` with superscript formatting, covering other squared statistics such as `η²`, `ω²`, `ε²`, `f²`, and `σ²`
 - italicizes selected Latin statistical symbols before operators
 - normalizes spacing in degrees-of-freedom expressions
 

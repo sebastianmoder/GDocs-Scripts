@@ -20,6 +20,7 @@
 *    χ2 / χ² / χ^2       -> roman χ + superscript 2
 *    ηp2 / ηp² / ηp^2
 *    η_p2 / η_p² / η_p^2 -> roman η + subscript p + superscript 2
+*    Any remaining ² glyph -> roman superscript 2, regardless of the symbol.
 *
 * 5. Convert hyphen-minus in negative numeric values to a true minus sign:
 *    -.04  -> −.04
@@ -60,11 +61,38 @@ function processTextElement_(textElement) {
     formatPartialEtaSquared_(textElement);
     formatRSquared_(textElement);
     formatChiSquared_(textElement);
+    normalizeSquaredGlyphs_(textElement);
     
     normalizeDfCommaSpaces_(textElement);
     
     italicizeStatSymbolsBeforeOperators_(textElement);
     italicizeTestStatisticsWithDf_(textElement);
+}
+
+
+/**
+ * Converts every remaining ² glyph to a regular 2 with superscript formatting.
+ *
+ * Runs after the statistic-specific formatters so their symbol/subscript rules
+ * still apply. Covers other squared statistics, such as η², ω², ε², f², and σ²,
+ * without a symbol allowlist. Applies anywhere in the processed body text.
+ * Only replaces the glyph itself, preserving its other attributes and leaving
+ * surrounding characters untouched.
+ */
+function normalizeSquaredGlyphs_(textElement) {
+  const text = textElement.getText();
+  const matches = [...text.matchAll(/²/g)];
+
+  for (let i = matches.length - 1; i >= 0; i--) {
+    const index = matches[i].index;
+    replaceRangePreservingStyle_(textElement, index, index, "2");
+    textElement.setItalic(index, index, false);
+    textElement.setTextAlignment(
+      index,
+      index,
+      DocumentApp.TextAlignment.SUPERSCRIPT
+    );
+  }
 }
 
 
@@ -137,7 +165,8 @@ function formatRSquared_(textElement) {
     const text = textElement.getText();
     if (!text || !/R(?:2|²|\^2)/.test(text)) return;
     
-    const pattern = /\bR(?:2|²|\^2)\b/g;
+    // ² is not a regex word character, so a trailing \b misses R² before spaces.
+    const pattern = /\bR(?:2|²|\^2)(?!\w)/g;
     const matches = [...text.matchAll(pattern)];
     
     for (let i = matches.length - 1; i >= 0; i--) {
