@@ -16,8 +16,9 @@
  *
  * SYMBOL FORMATTING:
  * - Italicizes p, r, R, t, F, z, M, SD, SE, b, B, d, df, k, n, and N before
- *   comparison operators, with or without surrounding parentheses. For ps,
- *   italicizes only p and makes s roman. Also italicizes t and F before "(".
+ *   comparison operators, with or without surrounding parentheses. For ps, ns,
+ *   and Ns, italicizes only the first letter and makes s roman.
+ *   Also italicizes t and F before "(".
  * - Formats R2 / R² / R^2 as italic R with a roman superscript 2, and resets
  *   immediately following spaces and comparison operators to roman baseline.
  * - Formats χ2 / χ² / χ^2 as roman χ with a roman superscript 2.
@@ -352,6 +353,8 @@ function normalizeDfCommaSpaces_(textElement) {
 * Examples:
 * p = .032       -> p italic
 * ps ≥ .148      -> only p italic, s roman
+* ns ≥ 20        -> only n italic, s roman
+* Ns = 100       -> only N italic, s roman
 * r = .26        -> r italic
 * M = 4.21       -> M italic
 * SD = 1.03      -> SD italic
@@ -371,8 +374,8 @@ function italicizeStatSymbolsBeforeOperators_(textElement) {
         { regex: new RegExp("\\bSE(?=" + space + op + space + ")", "g"), italicStart: 0, italicLength: 2 },
         { regex: new RegExp("\\bdf(?=" + space + op + space + ")", "g"), italicStart: 0, italicLength: 2 },
         
-        // Plural p-values: ps ≥ .148. Italicize only p.
-        { regex: new RegExp("\\bps(?=" + space + op + space + ")", "g"), italicStart: 0, italicLength: 1, romanOffsets: [1] },
+        // Plural symbols: ps, ns, Ns. Keep the trailing s roman.
+        { regex: new RegExp("\\b[pnN]s(?=" + space + op + space + ")", "g"), italicStart: 0, italicLength: 1, romanOffsets: [1] },
         
         // Single-character symbols.
         { regex: new RegExp("\\bp(?=" + space + op + space + ")", "g"), italicStart: 0, italicLength: 1 },
