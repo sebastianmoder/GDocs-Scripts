@@ -22,15 +22,38 @@ Save the project and reload the Google Doc to display the enabled menu items. Ke
 
 The script is designed for APA 7 statistical notation cleanup in manuscript drafts. It:
 
-- adds non-breaking spaces around comparison operators
-- converts `>=` and `<=` to APA-friendly comparison symbols
-- converts hyphen-minus signs in negative numbers to true minus signs
-- formats common statistics such as `R2`, chi-squared, and partial eta squared
-- converts every `²` glyph in processed body text to a regular `2` with superscript formatting, covering other squared statistics such as `η²`, `ω²`, `ε²`, `f²`, and `σ²`
-- italicizes selected Latin statistical symbols before operators
-- normalizes spacing in degrees-of-freedom expressions
+- adds non-breaking spaces around `=`, `>`, `<`, `≥`, `≤`, `≠`, `≈`, and `±`; converts `>=`, `<=`, and `!=` to symbols
+- spaces binary `+` and `−` between recognized numeric/statistical operands; converts hyphen subtraction involving a known statistic (such as `n-1`) while preserving numeric hyphen ranges such as `12-24`
+- converts hyphen-minus and en-dash signs in negative numbers to true minus signs
+- formats squared `R`, `r`, `f`, `s`, `k`, `I`, `T`, `χ`, `η`, `ω`, `ε`, and `σ`, accepting plain `2`, `²`, and `^2` forms; Latin bases are italic, Greek bases are roman, and the exponent is roman superscript
+- formats partial/generalized eta squared (`η_p^2`, `η_g²`, also without underscores), correlations (`r_s`, `r_pb`, `r_tb`, also `rₛ`), and Bayes factors (`BF10`, `BF01`, also underscore or Unicode subscript forms); identifying subscripts are roman
+- converts every remaining `²` glyph in processed body text to a regular `2` with superscript formatting
+- italicizes Latin statistics in expressions, including `Mdn`, `MS`, `MSE`, `SSE`, `SS`, `U`, `W`, `H`, `Q`, `D`, `V`, `g`, `f`, `s`, and `OR`, alongside the original symbols; plural suffixes such as those in `Ms`, `SDs`, and `rs` remain roman
+- recognizes phrases such as `Cohen’s d`, `Hedges’ g`, `p values`, `t-test`, and `z scores`, and standalone statistical labels occupying a whole table cell
+- makes standalone Greek statistical letters roman
+- removes spaces before numeric degrees-of-freedom parentheses (`t (42)` → `t(42)`, `F (2,145)` → `F(2, 145)`) and inserts one non-breaking space after each df comma, including when no space existed
+
+Matching does not span text elements. Standalone Latin letters in ordinary prose are left alone. Whole-cell statistical labels are recognized by their text, without inferring a table's structure or meaning. Reverse italics in italicized titles are not inferred automatically. Numerical values, leading zeros, and precision are unchanged.
 
 Run it on a clean copy of a manuscript. The script deliberately avoids broad text replacement methods and whole-paragraph rewrites, but formatting tools that modify rich Google Docs text should still be tested on a duplicate document first.
+
+#### Notation validation
+
+Run `node tests/tidyApaStatNotation.test.js` from the repository root for local regression checks using a rich-text mock. These verify text, italics, subscripts/superscripts, preservation of surviving characters' bold/color/link attributes, repeated runs, and table traversal. They do not replace testing in Google Docs.
+
+For manual validation in a duplicate Doc, check the following; spaces beside operators and after df commas should be non-breaking. Live Google Docs results have not yet been recorded.
+
+| Input | Expected result |
+| --- | --- |
+| `t (42)=2.10; F (2,145)=4.2` | `t(42) = 2.10; F(2, 145) = 4.2`, with italic test symbols |
+| `Mdn=.5; U=15; OR=2.1; SDs>.1` | Spaced operators, italic statistics, roman plural `s` |
+| `r^2=.2; f²=.15; ω2=.1` | Superscript exponents; italic `r`/`f`, roman `ω` |
+| `η_g^2=.1; r_pb=.3; BF_10=4` | Roman identifying subscripts, superscript eta exponent, italic Latin bases |
+| `p!=.05; b≈-.04; M±SD; n-1; 12-24` | `p ≠ .05; b ≈ −.04; M ± SD; n − 1; 12-24` |
+| `Cohen’s d; p values; t-test; z scores` | Only the statistical symbols become italic |
+| Standalone `M`/`SD` in table cells and `M` in ordinary prose | Table labels become italic; standalone prose letter stays unchanged |
+| Mixed bold/color/link formatting across `η_p^2` and `t (42)` | Surviving characters retain those attributes; only notation italics/alignment change |
+| Repeat a run; include text in another tab/header/footer | Same result on rerun; excluded areas remain unchanged |
 
 ### `showHeadingWordCounts.gs`
 
