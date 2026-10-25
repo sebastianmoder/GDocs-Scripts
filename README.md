@@ -35,6 +35,8 @@ The script is designed for APA 7 statistical notation cleanup in manuscript draf
 
 Matching does not span text elements. Standalone Latin letters in ordinary prose are left alone. Whole-cell statistical labels are recognized by their text, without inferring a table's structure or meaning. Reverse italics in italicized titles are not inferred automatically. Numerical values, leading zeros, and precision are unchanged.
 
+Visible URLs and all hyperlink text are excluded from cleanup: their characters, link targets, and formatting remain unchanged. This includes URLs with schemes, `www.` addresses, and bare domains with paths or query parameters. Visible URL tails are conservatively protected through the next whitespace or quotation mark, including closing punctuation. Statistical notation before and after these protected spans is still processed.
+
 Run it on a clean copy of a manuscript. The script deliberately avoids broad text replacement methods and whole-paragraph rewrites, but formatting tools that modify rich Google Docs text should still be tested on a duplicate document first.
 
 #### Notation validation
@@ -52,7 +54,9 @@ For manual validation in a duplicate Doc, check the following; spaces beside ope
 | `p!=.05; b≈-.04; M±SD; n-1; 12-24` | `p ≠ .05; b ≈ −.04; M ± SD; n − 1; 12-24` |
 | `Cohen’s d; p values; t-test; z scores` | Only the statistical symbols become italic |
 | Standalone `M`/`SD` in table cells and `M` in ordinary prose | Table labels become italic; standalone prose letter stays unchanged |
-| Mixed bold/color/link formatting across `η_p^2` and `t (42)` | Surviving characters retain those attributes; only notation italics/alignment change |
+| Mixed bold/color formatting across `η_p^2` and `t (42)` | Surviving characters retain those attributes; only notation italics/alignment change |
+| `p=.05; https://example.org/r^2?p=.1&n=-1 t (42)=2` | Nearby statistics are cleaned up; URL characters and formatting remain unchanged |
+| Hyperlinked `η_p^2=.1`, including mixed formatting within the link | Entire linked text, link target, and formatting remain unchanged |
 | Repeat a run; include text in another tab/header/footer | Same result on rerun; excluded areas remain unchanged |
 
 ### `showHeadingWordCounts.gs`

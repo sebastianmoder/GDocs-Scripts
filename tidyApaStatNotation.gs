@@ -5,6 +5,7 @@
  * Excludes headers, footers, footnotes, and other tabs. Changes are local:
  * surviving characters retain their rich-text attributes except for the
  * notation-specific italics and alignment described below.
+ * Visible URLs and linked text are excluded, including their formatting.
  *
  * - Spaces comparisons (=, >, <, ≥, ≤, ≠, ≈), ±, and recognized binary +/−
  *   expressions with non-breaking spaces; converts >=, <=, and !=.
@@ -55,6 +56,76 @@ function processElement_(element, isTableLabel) {
 }
 
 function processTextElement_(textElement, isTableLabel) {
+  const ranges = protectedUrlRanges_(textElement);
+  if (!ranges.length) {
+    processStatText_(textElement, isTableLabel);
+    return;
+  }
+  // Work backwards so edits never shift the original offsets still to process.
+  let end = textElement.getText().length;
+  for (let i = ranges.length - 1; i >= 0; i--) {
+    if (ranges[i].end < end) {
+      processStatText_(statTextRange_(textElement, ranges[i].end, end), isTableLabel);
+    }
+    end = ranges[i].start;
+  }
+  if (end > 0) processStatText_(statTextRange_(textElement, 0, end), isTableLabel);
+}
+
+/** Returns merged, end-exclusive spans for visible URLs and hyperlink text. */
+function protectedUrlRanges_(textElement) {
+  const text = textElement.getText();
+  // Consume URL tails conservatively, including query operators and punctuation.
+  // Also recognize addresses without a scheme (e.g., doi.org/10.1234/r^2).
+  const tail = "[^\\s\"“”]";
+  const scheme = "(?:[a-z][a-z\\d+.-]*://|(?:mailto|tel|urn|doi|data):|www\\.)";
+  const host = "(?:(?:[\\p{L}\\p{N}-]+\\.)+[\\p{L}]{2,}|(?:\\d{1,3}\\.){3}\\d{1,3}|localhost)";
+  // Include an opening angle bracket so a wrapped URL is not spaced as '<'.
+  const pattern = new RegExp("<?(?:" + scheme + tail + "+|" + host +
+    "(?::\\d+)?(?:[/?#]" + tail + "*)?)", "giu");
+  const ranges = [...text.matchAll(pattern)].map(match => ({
+    start: match.index, end: match.index + match[0].length
+  }));
+  const indices = textElement.getTextAttributeIndices();
+  for (let i = 0; i < indices.length; i++) {
+    const start = indices[i];
+    if (start < text.length && textElement.getLinkUrl(start)) {
+      ranges.push({start, end: i + 1 < indices.length ? indices[i + 1] : text.length});
+    }
+  }
+  ranges.sort((a, b) => a.start - b.start);
+  const merged = [];
+  for (const range of ranges) {
+    const last = merged[merged.length - 1];
+    if (last && range.start <= last.end) {
+      last.end = Math.max(last.end, range.end);
+    } else {
+      merged.push({start: range.start, end: range.end});
+    }
+  }
+  return merged;
+}
+
+/** A local-offset Text view keeps matching and edits outside protected spans. */
+function statTextRange_(textElement, start, end) {
+  return {
+    getText: () => textElement.getText().slice(start, end),
+    getAttributes: index => textElement.getAttributes(start + index),
+    setAttributes: (first, last, attrs) => textElement.setAttributes(start + first, start + last, attrs),
+    setItalic: (first, last, value) => textElement.setItalic(start + first, start + last, value),
+    setTextAlignment: (first, last, value) => textElement.setTextAlignment(start + first, start + last, value),
+    deleteText: (first, last) => {
+      textElement.deleteText(start + first, start + last);
+      end -= last - first + 1;
+    },
+    insertText: (index, value) => {
+      textElement.insertText(start + index, value);
+      end += value.length;
+    }
+  };
+}
+
+function processStatText_(textElement, isTableLabel) {
   normalizeMinusSigns_(textElement);
   normalizeComparisonOperators_(textElement);
   normalizeArithmeticOperators_(textElement);

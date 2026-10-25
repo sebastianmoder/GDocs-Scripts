@@ -19,13 +19,20 @@ class MockText {
     // Document offsets, like JavaScript regex indices, count UTF-16 code units.
     this.attrs = Array.from({length: value.length}, (_, index) => ({
       italic: false, alignment: "normal", bold: index % 2 === 0,
-      color: `color-${index}`, link: `link-${index}`
+      color: `color-${index}`, link: null, marker: `character-${index}`
     }));
   }
   getType() { return "text"; }
   asText() { return this; }
   getText() { return this.value; }
   getAttributes(index) { this.range(index, index); return {...this.attrs[index]}; }
+  getLinkUrl(index) { this.range(index, index); return this.attrs[index].link; }
+  getTextAttributeIndices() {
+    return this.attrs.reduce((indices, attrs, index) => {
+      if (!index || JSON.stringify(attrs) !== JSON.stringify(this.attrs[index - 1])) indices.push(index);
+      return indices;
+    }, []);
+  }
   range(start, end) {
     assert(start >= 0 && end >= start && end < this.value.length,
       `Invalid range ${start}:${end} for ${JSON.stringify(this.value)}`);
@@ -160,12 +167,84 @@ const styled = check(input, `prefix ηp2${nb}=${nb}.12; rs; BF10; t(42); F(2,${n
 let cursor = 0;
 for (let i = 0; i < input.length; i++) {
   if (input[i] === "_" || input[i] === "^" || input[i] === " ") continue;
-  const at = styled.attrs.findIndex((a, j) => j >= cursor && a.link === `link-${i}`);
+  const at = styled.attrs.findIndex((a, j) => j >= cursor && a.marker === `character-${i}`);
   assert(at >= cursor, `Original style lost for ${input[i]} at ${i}`);
   assert.equal(styled.attrs[at].bold, i % 2 === 0);
   assert.equal(styled.attrs[at].color, `color-${i}`);
   cursor = at + 1;
 }
+
+// URLs must retain every character and attribute through all cleanup passes.
+function checkProtected(input, expected, spans, prepare = () => {}, isTableLabel = false) {
+  const snapshots = [];
+  return check(input, expected, text => {
+    for (const snapshot of snapshots) {
+      const start = text.value.indexOf(snapshot.value);
+      assert(start >= 0, `Protected text lost: ${snapshot.value}`);
+      assert.deepEqual(text.attrs.slice(start, start + snapshot.value.length), snapshot.attrs,
+        `Protected formatting changed: ${snapshot.value}`);
+    }
+  }, isTableLabel, text => {
+    prepare(text);
+    for (const value of spans) {
+      const start = input.indexOf(value);
+      assert(start >= 0, value);
+      // Deliberately use non-default italics/alignment to catch formatting changes.
+      text.setItalic(start, start + value.length - 1, true);
+      text.setTextAlignment(start, start + value.length - 1, "sub");
+      snapshots.push({value, attrs: text.attrs.slice(start, start + value.length).map(a => ({...a}))});
+    }
+  });
+}
+
+for (const url of [
+  "https://example.org/search?p=.05&n=-1&r^2=.2#η_p²",
+  "HTTP://example.org/r_s/BF_10/χ²/α?q=2+3&x!=.1",
+  "https://example.org/p>=.05&x<=.1&b≈-.04&n-1&cm²",
+  "www.example.org/r_pb?F(2,145)=3&x=±2",
+  "doi.org/10.1234/r^2?p=.01",
+  "example.org:8080/η_g^2?BF₁₀=2",
+  "127.0.0.1:8080/r^2?p=.05",
+  "localhost:8080/r^2?p=.05",
+  "https://例子.测试/σ²?p=.05",
+  "ftp://example.org/-2?p=.05",
+  "mailto:stats@example.org?subject=p=.05",
+  "doi:10.1234/r^2",
+  "data:text/plain,p=.05"
+]) {
+  checkProtected(url, url, [url]);
+  checkProtected(`📊 η_p^2=.1; ${url} t (42)=2.1; cm²`,
+    `📊 ηp2${nb}=${nb}.1; ${url} t(42)${nb}=${nb}2.1; cm2`, [url]);
+}
+
+const firstUrl = "https://example.org/?p=.05";
+const secondUrl = "www.example.com/r^2?x=-2";
+checkProtected(`p=.1; ${firstUrl} F (2,145)=3; ${secondUrl} n-1`,
+  `p${nb}=${nb}.1; ${firstUrl} F(2,${nb}145)${nb}=${nb}3; ${secondUrl} n${nb}−${nb}1`,
+  [firstUrl, secondUrl]);
+checkProtected(`<${firstUrl}>; p=.1`, `<${firstUrl}>; p${nb}=${nb}.1`, [firstUrl]);
+checkProtected(`"${firstUrl}"; p=.1`, `"${firstUrl}"; p${nb}=${nb}.1`, [firstUrl]);
+
+function linkSpan(text, value) {
+  const start = text.value.indexOf(value);
+  for (let i = start; i < start + value.length; i++) text.attrs[i].link = firstUrl;
+}
+const linkLabel = "η_p^2=.1; t (42); cm²; α; p values";
+checkProtected(`r^2=.2; ${linkLabel} F (2,145)=3`,
+  `r2${nb}=${nb}.2; ${linkLabel} F(2,${nb}145)${nb}=${nb}3`, [linkLabel],
+  text => linkSpan(text, linkLabel));
+// Adjacent protected runs merge even when they have different link/style attributes.
+checkProtected("αr^2p=.1", `αr^2p${nb}=${nb}.1`, ["αr^2"], text => {
+  linkSpan(text, "α");
+  linkSpan(text, "r^2");
+  for (let i = 1; i < 4; i++) text.attrs[i].link = secondUrl;
+});
+checkProtected("SD", "SD", ["SD"], text => linkSpan(text, "SD"), true);
+checkProtected(`p=.1 ${firstUrl} F (1,2)=3`,
+  `p${nb}=${nb}.1 ${firstUrl} F(1,${nb}2)${nb}=${nb}3`, [firstUrl], text => {
+    // A single link run overlaps only part of a visible URL.
+    linkSpan(text, "example.org");
+  });
 
 // Traversal only treats complete table-cell labels as standalone statistics.
 function container(type, children) {
