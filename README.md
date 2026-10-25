@@ -10,12 +10,13 @@ Most scripts are intended to be copied into a document-bound Apps Script project
 
 Copy `menu.gs` into the same document-bound Apps Script project as the utilities you want to use. It defines an `onOpen()` function that creates the `Document Utilities` menu.
 
-Both `.addItem(...)` lines are commented out by default. Uncomment the line for each script imported into the project:
+All `.addItem(...)` lines are commented out by default. Uncomment the line for each script imported into the project:
 
-- `Tidy statistical notation` runs `tidyApaStatNotation` from `tidyApaStatNotation.gs`.
-- `Words by heading` runs `showHeadingWordCounts` from `showHeadingWordCounts.gs`.
+- `Count words by heading` runs `showHeadingWordCounts` from `showHeadingWordCounts.gs`.
+- `Tidy APA statistical notation` runs `tidyApaStatNotation` from `tidyApaStatNotation.gs`.
+- `Highlight parenthetical citations` runs `highlightParentheticalCitations` from `highlightCitations.gs`.
 
-Save the project and reload the Google Doc to display the enabled menu items. Keep only one `onOpen()` function in the project; if you already have one, merge the menu setup into it. You can also run either utility directly from the Apps Script editor without importing the menu template.
+Save the project and reload the Google Doc to display the enabled menu items. Keep only one `onOpen()` function in the project; if you already have one, merge the menu setup into it. You can also run any utility directly from the Apps Script editor without importing the menu template.
 
 ### `tidyApaStatNotation.gs`
 
@@ -42,6 +43,16 @@ The report includes:
 - plain text, Markdown, table (TSV), CSV, and nested JSON formats, with copy and download buttons
 
 Counts use a preview with all suggestions accepted. The script never changes the document or accepts or rejects suggestions. Section counts exclude heading text by default; set `INCLUDE_HEADING_TEXT` to `true` in `showHeadingWordCounts()` to include it. Tab and document totals always include headings and text before the first heading.
+
+### `highlightCitations.gs`
+
+Run `highlightParentheticalCitations` to highlight matching parenthetical passages in pale yellow (`#FFF3B0`) and display the number of passages highlighted. It processes only the active tab's body, including ordinary table text, and does not require the advanced Google Docs API service.
+
+A passage matches if it contains a year from 1900 to 2099, optionally followed by a letter, or a no-date marker such as `n.d.` or `n. d.`. Matching is case-insensitive. Examples include `(Smith, 2020)`, `(Smith et al., 2020a)`, and `(Smith, 2020; Jones, n.d.)`. The entire passage, including parentheses, is highlighted and counted once, even if it contains multiple sources.
+
+This is a date-based heuristic: passages such as `(the project began in 2020)` also match. It skips passages without a qualifying date, square-bracket citations, and passages spanning paragraph breaks. With nested parentheses, only qualifying inner passages match.
+
+Run it on a duplicate manuscript first. Matching passages have their existing background colors overwritten; other formatting is preserved. The script does not clear existing highlights when rerun.
 
 ## Typical Use
 

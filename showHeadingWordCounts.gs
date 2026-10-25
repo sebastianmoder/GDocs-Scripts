@@ -1,7 +1,30 @@
-// Setup: Apps Script editor > Services (+) > Google Docs API > Add.
-// Reads a preview with suggestions accepted; never modifies the document.
-// Report UI v5: current-tab and document totals, nested JSON, Copy button, CSV.
-
+/**
+ * Opens a read-only word-count report for headings in the active Google Docs tab.
+ *
+ * SETUP:
+ * Enable the advanced Google Docs API service in the Apps Script editor:
+ * Services (+) > Google Docs API > Add. Run from a document-bound project.
+ *
+ * COUNTING:
+ * - Lists H1–H6 sections in document order; each parent includes its subsections.
+ * - Excludes heading text from section counts by default. Set
+ *   INCLUDE_HEADING_TEXT to true to include both own and nested heading text.
+ * - Reports separate totals for the active tab and all tabs, including child
+ *   tabs. These totals always include headings and text before the first heading.
+ * - Reads body paragraphs, lists, and tables; skips generated tables of contents.
+ *   Headers, footers, and footnotes are outside the counting scope.
+ * - Counts Unicode letter/number sequences, keeping internal apostrophes and
+ *   hyphens within words. Counts may differ from Google Docs' native word count.
+ *
+ * SUGGESTIONS AND OUTPUT:
+ * Reads a preview with all suggested changes accepted, without modifying the
+ * document or accepting/rejecting suggestions. Displays plain text, Markdown,
+ * table (TSV), CSV, and nested JSON formats with copy and download controls.
+ *
+ * Alerts and returns if the advanced service is unavailable.
+ *
+ * @throws {Error} If there is no active tab or it is missing from the preview.
+ */
 function showHeadingWordCounts() {
     // Set to true to include each heading's own text and nested heading text.
     const INCLUDE_HEADING_TEXT = false;
@@ -375,4 +398,3 @@ function showHeadingWordCounts() {
                 const words = text.match(/[\p{L}\p{N}][\p{L}\p{M}\p{N}]*(?:['’‐‑-][\p{L}\p{N}][\p{L}\p{M}\p{N}]*)*/gu);
                 return words ? words.length : 0;
             }
-            
