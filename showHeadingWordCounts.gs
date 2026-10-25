@@ -3,113 +3,113 @@
 // Report UI v5: current-tab and document totals, nested JSON, Copy button, CSV.
 
 function showHeadingWordCounts() {
-  // Set to true to include each heading's own text and nested heading text.
-  const INCLUDE_HEADING_TEXT = false;
-
-  const document = DocumentApp.getActiveDocument();
-  const tab = document.getActiveTab();
-  if (!tab) throw new Error('Run this script from its Google Docs document.');
-
-  if (typeof Docs === 'undefined') {
-    DocumentApp.getUi().alert(
-      'Enable Google Docs API in the Apps Script editor: Services (+) > ' +
-      'Google Docs API > Add. Then run the word count again.'
-    );
-    return;
-  }
-
-  // GET only: suggested deletions disappear and suggested insertions remain
-  // in the returned preview. No suggestions are actually accepted or rejected.
-  const preview = Docs.Documents.get(document.getId(), {
-    suggestionsViewMode: 'PREVIEW_SUGGESTIONS_ACCEPTED',
-    includeTabsContent: true
-  });
-  const previewTab = findPreviewTab_(preview.tabs || [], tab.getId());
-  if (!previewTab || !previewTab.documentTab || !previewTab.documentTab.body) {
-    throw new Error('The active tab was not found in the preview. Try again.');
-  }
-
-  const headings = [];
-  const active = [];
-
-  function paragraphText(paragraph) {
-    // Join runs without spaces: formatting and suggestions can split a word.
-    return (paragraph.elements || []).map(function (element) {
-      return element.textRun ? element.textRun.content || '' : '';
-    }).join('');
-  }
-
-  function processParagraph(paragraph) {
-    const text = paragraphText(paragraph);
-    const style = (paragraph.paragraphStyle || {}).namedStyleType || '';
-    const match = /^HEADING_([1-6])$/.exec(style);
-    const level = match ? Number(match[1]) : 0;
-
-    if (level > 0) {
-      // A same-level or higher-level heading closes the preceding section.
-      while (active.length && active[active.length - 1].level >= level) {
-        active.pop();
-      }
-      const heading = {
-        level: level,
-        title: text.replace(/\s+/g, ' ').trim() || '(untitled heading)',
-        words: 0
-      };
-      headings.push(heading);
-      active.push(heading);
-      if (!INCLUDE_HEADING_TEXT) return;
+    // Set to true to include each heading's own text and nested heading text.
+    const INCLUDE_HEADING_TEXT = false;
+    
+    const document = DocumentApp.getActiveDocument();
+    const tab = document.getActiveTab();
+    if (!tab) throw new Error('Run this script from its Google Docs document.');
+    
+    if (typeof Docs === 'undefined') {
+        DocumentApp.getUi().alert(
+            'Enable Google Docs API in the Apps Script editor: Services (+) > ' +
+            'Google Docs API > Add. Then run the word count again.'
+        );
+        return;
     }
-
-    // Credit this text to its heading and every still-open parent heading.
-    const count = countWords_(text);
-    active.forEach(function (heading) { heading.words += count; });
-  }
-
-  function walk(content, visitParagraph) {
-    (content || []).forEach(function (element) {
-      if (element.paragraph) {
-        // List items also appear as paragraphs in the Docs API.
-        visitParagraph(element.paragraph);
-      } else if (element.table) {
-        (element.table.tableRows || []).forEach(function (row) {
-          (row.tableCells || []).forEach(function (cell) {
-            walk(cell.content, visitParagraph);
-          });
-        });
-      }
-      // Skip generated tables of contents and other non-body-text elements.
+    
+    // GET only: suggested deletions disappear and suggested insertions remain
+    // in the returned preview. No suggestions are actually accepted or rejected.
+    const preview = Docs.Documents.get(document.getId(), {
+        suggestionsViewMode: 'PREVIEW_SUGGESTIONS_ACCEPTED',
+        includeTabsContent: true
     });
-  }
-
-  // Count each paragraph once across all tabs, including nested tabs. This
-  // total always includes headings and text before the first heading.
-  let documentWords = 0;
-  function countTabs(tabs) {
-    (tabs || []).forEach(function (previewDocumentTab) {
-      const body = (previewDocumentTab.documentTab || {}).body;
-      if (body) {
-        walk(body.content, function (paragraph) {
-          documentWords += countWords_(paragraphText(paragraph));
+    const previewTab = findPreviewTab_(preview.tabs || [], tab.getId());
+    if (!previewTab || !previewTab.documentTab || !previewTab.documentTab.body) {
+        throw new Error('The active tab was not found in the preview. Try again.');
+    }
+    
+    const headings = [];
+    const active = [];
+    
+    function paragraphText(paragraph) {
+        // Join runs without spaces: formatting and suggestions can split a word.
+        return (paragraph.elements || []).map(function (element) {
+            return element.textRun ? element.textRun.content || '' : '';
+        }).join('');
+    }
+    
+    function processParagraph(paragraph) {
+        const text = paragraphText(paragraph);
+        const style = (paragraph.paragraphStyle || {}).namedStyleType || '';
+        const match = /^HEADING_([1-6])$/.exec(style);
+        const level = match ? Number(match[1]) : 0;
+        
+        if (level > 0) {
+            // A same-level or higher-level heading closes the preceding section.
+            while (active.length && active[active.length - 1].level >= level) {
+                active.pop();
+            }
+            const heading = {
+                level: level,
+                title: text.replace(/\s+/g, ' ').trim() || '(untitled heading)',
+                words: 0
+            };
+            headings.push(heading);
+            active.push(heading);
+            if (!INCLUDE_HEADING_TEXT) return;
+        }
+        
+        // Credit this text to its heading and every still-open parent heading.
+        const count = countWords_(text);
+        active.forEach(function (heading) { heading.words += count; });
+    }
+    
+    function walk(content, visitParagraph) {
+        (content || []).forEach(function (element) {
+            if (element.paragraph) {
+                // List items also appear as paragraphs in the Docs API.
+                visitParagraph(element.paragraph);
+            } else if (element.table) {
+                (element.table.tableRows || []).forEach(function (row) {
+                    (row.tableCells || []).forEach(function (cell) {
+                        walk(cell.content, visitParagraph);
+                    });
+                });
+            }
+            // Skip generated tables of contents and other non-body-text elements.
         });
-      }
-      countTabs(previewDocumentTab.childTabs);
+    }
+    
+    // Count each paragraph once across all tabs, including nested tabs. This
+    // total always includes headings and text before the first heading.
+    let documentWords = 0;
+    function countTabs(tabs) {
+        (tabs || []).forEach(function (previewDocumentTab) {
+            const body = (previewDocumentTab.documentTab || {}).body;
+            if (body) {
+                walk(body.content, function (paragraph) {
+                    documentWords += countWords_(paragraphText(paragraph));
+                });
+            }
+            countTabs(previewDocumentTab.childTabs);
+        });
+    }
+    countTabs(preview.tabs);
+    
+    // Like the document total, include headings and introductory text in this
+    // total, independently of the per-heading INCLUDE_HEADING_TEXT setting.
+    let currentTabWords = 0;
+    walk(previewTab.documentTab.body.content, function (paragraph) {
+        currentTabWords += countWords_(paragraphText(paragraph));
+        processParagraph(paragraph);
     });
-  }
-  countTabs(preview.tabs);
-
-  // Like the document total, include headings and introductory text in this
-  // total, independently of the per-heading INCLUDE_HEADING_TEXT setting.
-  let currentTabWords = 0;
-  walk(previewTab.documentTab.body.content, function (paragraph) {
-    currentTabWords += countWords_(paragraphText(paragraph));
-    processParagraph(paragraph);
-  });
-
-  const lines = headings.map(function (heading) {
-    return '  '.repeat(heading.level - 1) + 'H' + heading.level +
-      '\t' + heading.title + '\t' + heading.words;
-  });
-  const report = 'Tab: ' + tab.getTitle() + '\n' +
+    
+    const lines = headings.map(function (heading) {
+        return '  '.repeat(heading.level - 1) + 'H' + heading.level +
+        '\t' + heading.title + '\t' + heading.words;
+    });
+    const report = 'Tab: ' + tab.getTitle() + '\n' +
     'Suggestions: preview with all accepted (document unchanged)\n' +
     'Heading text included: ' + (INCLUDE_HEADING_TEXT ? 'yes\n\n' : 'no\n\n') +
     'Current tab (suggestions accepted): ' + currentTabWords + ' words\n' +
@@ -117,81 +117,81 @@ function showHeadingWordCounts() {
     documentWords + ' words' +
     '\n\nLevel\tHeading\tWords\n' +
     (lines.length ? lines.join('\n') : 'No H1–H6 headings found.');
-
-  const markdown = [
-    'Tab: ' + escapeWordCountMarkdown_(tab.getTitle()),
-    'Suggestions: preview with all accepted (document unchanged)',
-    'Heading text included: ' + (INCLUDE_HEADING_TEXT ? 'yes' : 'no'),
-    '',
-    'Current tab (suggestions accepted): ' + currentTabWords + ' words',
-    'Entire document (all tabs, suggestions accepted): ' + documentWords + ' words',
-    '',
-    '| Level | Heading | Words |',
-    '| --- | --- | ---: |'
-  ].concat(headings.map(function (heading) {
-    return '| H' + heading.level + ' | ' +
-      escapeWordCountMarkdown_(heading.title) + ' | ' + heading.words + ' |';
-  }));
-  if (!headings.length) markdown.push('', 'No H1–H6 headings found.');
-
-  const nestedHeadings = [];
-  const parentHeadings = [];
-  headings.forEach(function (heading) {
-    const node = {
-      level: heading.level, title: heading.title, words: heading.words, children: []
-    };
-    while (parentHeadings.length &&
-           parentHeadings[parentHeadings.length - 1].level >= node.level) {
-      parentHeadings.pop();
-    }
-    const siblings = parentHeadings.length ?
-      parentHeadings[parentHeadings.length - 1].children : nestedHeadings;
-    siblings.push(node);
-    parentHeadings.push(node);
-  });
-
-  const json = JSON.stringify({
-    tab: { id: tab.getId(), title: tab.getTitle() },
-    suggestionsViewMode: 'PREVIEW_SUGGESTIONS_ACCEPTED',
-    headingTextIncluded: INCLUDE_HEADING_TEXT,
-    currentTabWordCount: currentTabWords,
-    currentTabWordCountScope: 'Current tab only; includes heading text and introductory text',
-    documentWordCount: documentWords,
-    documentWordCountScope: 'All tabs; includes heading text and introductory text',
-    headings: nestedHeadings
-  }, null, 2);
-
-  const summary = report.slice(0, report.indexOf('\n\nLevel\tHeading\tWords'));
-  const tableContent = summary + '\n\n' + ['Level\tHeading\tWords'].concat(
-    headings.map(function (heading) {
-      return ['H' + heading.level, heading.title, heading.words].join('\t');
-    })
-  ).join('\n');
-
-  // Keep CSV rectangular and distinguish tab/document totals from headings.
-  const csvRows = [
-    ['Scope', 'Tab', 'Level', 'Heading', 'Words'],
-    ['Tab', tab.getTitle(), '', 'Current tab', currentTabWords],
-    ['Document', '', '', 'Entire document (all tabs)', documentWords]
-  ].concat(headings.map(function (heading) {
-    return ['Heading', tab.getTitle(), 'H' + heading.level, heading.title, heading.words];
-  }));
-  const csv = csvRows.map(function (row) {
-    return row.map(escapeWordCountCsv_).join(',');
-  }).join('\r\n');
-
-  // Serialize as data, escaping characters that could terminate an HTML script.
-  const formats = JSON.stringify({
-    text: { content: report, extension: 'txt', mime: 'text/plain' },
-    markdown: { content: markdown.join('\n'), extension: 'md', mime: 'text/markdown' },
-    table: { content: tableContent, extension: 'tsv', mime: 'text/tab-separated-values',
-      summary: summary, rows: headings },
-    csv: { content: csv, extension: 'csv', mime: 'text/csv' },
-    json: { content: json, extension: 'json', mime: 'application/json' }
-  }).replace(/</g, '\\u003c')
-    .replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
-
-  const html = HtmlService.createHtmlOutput(`
+    
+    const markdown = [
+        'Tab: ' + escapeWordCountMarkdown_(tab.getTitle()),
+        'Suggestions: preview with all accepted (document unchanged)',
+        'Heading text included: ' + (INCLUDE_HEADING_TEXT ? 'yes' : 'no'),
+        '',
+        'Current tab (suggestions accepted): ' + currentTabWords + ' words',
+        'Entire document (all tabs, suggestions accepted): ' + documentWords + ' words',
+        '',
+        '| Level | Heading | Words |',
+        '| --- | --- | ---: |'
+    ].concat(headings.map(function (heading) {
+        return '| H' + heading.level + ' | ' +
+        escapeWordCountMarkdown_(heading.title) + ' | ' + heading.words + ' |';
+    }));
+    if (!headings.length) markdown.push('', 'No H1–H6 headings found.');
+    
+    const nestedHeadings = [];
+    const parentHeadings = [];
+    headings.forEach(function (heading) {
+        const node = {
+            level: heading.level, title: heading.title, words: heading.words, children: []
+        };
+        while (parentHeadings.length &&
+            parentHeadings[parentHeadings.length - 1].level >= node.level) {
+                parentHeadings.pop();
+            }
+            const siblings = parentHeadings.length ?
+            parentHeadings[parentHeadings.length - 1].children : nestedHeadings;
+            siblings.push(node);
+            parentHeadings.push(node);
+        });
+        
+        const json = JSON.stringify({
+            tab: { id: tab.getId(), title: tab.getTitle() },
+            suggestionsViewMode: 'PREVIEW_SUGGESTIONS_ACCEPTED',
+            headingTextIncluded: INCLUDE_HEADING_TEXT,
+            currentTabWordCount: currentTabWords,
+            currentTabWordCountScope: 'Current tab only; includes heading text and introductory text',
+            documentWordCount: documentWords,
+            documentWordCountScope: 'All tabs; includes heading text and introductory text',
+            headings: nestedHeadings
+        }, null, 2);
+        
+        const summary = report.slice(0, report.indexOf('\n\nLevel\tHeading\tWords'));
+        const tableContent = summary + '\n\n' + ['Level\tHeading\tWords'].concat(
+            headings.map(function (heading) {
+                return ['H' + heading.level, heading.title, heading.words].join('\t');
+            })
+        ).join('\n');
+        
+        // Keep CSV rectangular and distinguish tab/document totals from headings.
+        const csvRows = [
+            ['Scope', 'Tab', 'Level', 'Heading', 'Words'],
+            ['Tab', tab.getTitle(), '', 'Current tab', currentTabWords],
+            ['Document', '', '', 'Entire document (all tabs)', documentWords]
+        ].concat(headings.map(function (heading) {
+            return ['Heading', tab.getTitle(), 'H' + heading.level, heading.title, heading.words];
+        }));
+        const csv = csvRows.map(function (row) {
+            return row.map(escapeWordCountCsv_).join(',');
+        }).join('\r\n');
+        
+        // Serialize as data, escaping characters that could terminate an HTML script.
+        const formats = JSON.stringify({
+            text: { content: report, extension: 'txt', mime: 'text/plain' },
+            markdown: { content: markdown.join('\n'), extension: 'md', mime: 'text/markdown' },
+            table: { content: tableContent, extension: 'tsv', mime: 'text/tab-separated-values',
+                summary: summary, rows: headings },
+                csv: { content: csv, extension: 'csv', mime: 'text/csv' },
+                json: { content: json, extension: 'json', mime: 'application/json' }
+            }).replace(/</g, '\\u003c')
+            .replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
+            
+            const html = HtmlService.createHtmlOutput(`
     <!doctype html>
     <html><head><meta charset="utf-8">
     <style>
@@ -249,7 +249,7 @@ function showHeadingWordCounts() {
         let currentFormat = 'text';
         let toastTimer;
         let copySequence = 0;
-
+                
         function showFormat(name) {
           currentFormat = name;
           const results = document.getElementById('results');
@@ -264,7 +264,7 @@ function showHeadingWordCounts() {
           document.getElementById('download').textContent =
             'Download .' + formats[name].extension;
         }
-
+                
         function showToast(message, duration) {
           const toast = document.getElementById('toast');
           clearTimeout(toastTimer);
@@ -272,7 +272,7 @@ function showHeadingWordCounts() {
           toast.hidden = false;
           toastTimer = setTimeout(function () { toast.hidden = true; }, duration);
         }
-
+                
         async function copyReport() {
           const sequence = ++copySequence;
           const text = formats[currentFormat].content;
@@ -316,7 +316,7 @@ function showHeadingWordCounts() {
             showToast('Copy blocked. Press Ctrl+C or ⌘C to copy the selected text.', 4000);
           }
         }
-
+                
         function downloadReport() {
           const format = formats[currentFormat];
           const blob = new Blob([format.content], { type: format.mime + ';charset=utf-8' });
@@ -329,7 +329,7 @@ function showHeadingWordCounts() {
           link.remove();
           setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
         }
-
+                
         document.getElementById('tableSummary').textContent = formats.table.summary;
         const tableRows = document.getElementById('tableRows');
         formats.table.rows.forEach(function (heading) {
@@ -347,31 +347,32 @@ function showHeadingWordCounts() {
       </script>
     </body></html>
   `).setWidth(720).setHeight(560);
-
-  DocumentApp.getUi().showModalDialog(html, 'Words by heading');
-}
-
-function escapeWordCountMarkdown_(value) {
-  return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;').replace(/[\\`*_{}\[\]()#+.!|>-]/g, '\\$&')
-    .replace(/[\r\n]+/g, ' ');
-}
-
-function escapeWordCountCsv_(value) {
-  return '"' + String(value).replace(/"/g, '""') + '"';
-}
-
-function findPreviewTab_(tabs, tabId) {
-  for (const tab of tabs) {
-    if (tab.tabProperties && tab.tabProperties.tabId === tabId) return tab;
-    const found = findPreviewTab_(tab.childTabs || [], tabId);
-    if (found) return found;
-  }
-  return null;
-}
-
-function countWords_(text) {
-  // Letters/numbers form words; internal apostrophes and hyphens stay together.
-  const words = text.match(/[\p{L}\p{N}][\p{L}\p{M}\p{N}]*(?:['’‐‑-][\p{L}\p{N}][\p{L}\p{M}\p{N}]*)*/gu);
-  return words ? words.length : 0;
-}
+                
+                DocumentApp.getUi().showModalDialog(html, 'Words by heading');
+            }
+            
+            function escapeWordCountMarkdown_(value) {
+                return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;').replace(/[\\`*_{}\[\]()#+.!|>-]/g, '\\$&')
+                .replace(/[\r\n]+/g, ' ');
+            }
+            
+            function escapeWordCountCsv_(value) {
+                return '"' + String(value).replace(/"/g, '""') + '"';
+            }
+            
+            function findPreviewTab_(tabs, tabId) {
+                for (const tab of tabs) {
+                    if (tab.tabProperties && tab.tabProperties.tabId === tabId) return tab;
+                    const found = findPreviewTab_(tab.childTabs || [], tabId);
+                    if (found) return found;
+                }
+                return null;
+            }
+            
+            function countWords_(text) {
+                // Letters/numbers form words; internal apostrophes and hyphens stay together.
+                const words = text.match(/[\p{L}\p{N}][\p{L}\p{M}\p{N}]*(?:['’‐‑-][\p{L}\p{N}][\p{L}\p{M}\p{N}]*)*/gu);
+                return words ? words.length : 0;
+            }
+            
