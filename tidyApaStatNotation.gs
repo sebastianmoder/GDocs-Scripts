@@ -29,14 +29,6 @@
  */
 
 
-function onOpen() {
-  DocumentApp.getUi()
-    .createMenu("APA Cleanup")
-    .addItem("Tidy statistical notation", "tidyApaStatNotation")
-    .addToUi();
-}
-
-
 function tidyApaStatNotation() {
   const doc = DocumentApp.getActiveDocument();
   const body = doc.getBody();
