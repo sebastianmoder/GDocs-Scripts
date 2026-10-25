@@ -1,5 +1,6 @@
 // Setup: Apps Script editor > Services (+) > Google Docs API > Add.
 // Reads a preview with suggestions accepted; never modifies the document.
+// Report UI v5: current-tab and document totals, nested JSON, Copy button, CSV.
 
 function showHeadingWordCounts() {
   // Set to true to include each heading's own text and nested heading text.
@@ -96,7 +97,13 @@ function showHeadingWordCounts() {
   }
   countTabs(preview.tabs);
 
-  walk(previewTab.documentTab.body.content, processParagraph);
+  // Like the document total, include headings and introductory text in this
+  // total, independently of the per-heading INCLUDE_HEADING_TEXT setting.
+  let currentTabWords = 0;
+  walk(previewTab.documentTab.body.content, function (paragraph) {
+    currentTabWords += countWords_(paragraphText(paragraph));
+    processParagraph(paragraph);
+  });
 
   const lines = headings.map(function (heading) {
     return '  '.repeat(heading.level - 1) + 'H' + heading.level +
@@ -105,6 +112,7 @@ function showHeadingWordCounts() {
   const report = 'Tab: ' + tab.getTitle() + '\n' +
     'Suggestions: preview with all accepted (document unchanged)\n' +
     'Heading text included: ' + (INCLUDE_HEADING_TEXT ? 'yes\n\n' : 'no\n\n') +
+    'Current tab (suggestions accepted): ' + currentTabWords + ' words\n' +
     'Entire document (all tabs, suggestions accepted): ' +
     documentWords + ' words' +
     '\n\nLevel\tHeading\tWords\n' +
@@ -115,6 +123,7 @@ function showHeadingWordCounts() {
     'Suggestions: preview with all accepted (document unchanged)',
     'Heading text included: ' + (INCLUDE_HEADING_TEXT ? 'yes' : 'no'),
     '',
+    'Current tab (suggestions accepted): ' + currentTabWords + ' words',
     'Entire document (all tabs, suggestions accepted): ' + documentWords + ' words',
     '',
     '| Level | Heading | Words |',
@@ -145,6 +154,8 @@ function showHeadingWordCounts() {
     tab: { id: tab.getId(), title: tab.getTitle() },
     suggestionsViewMode: 'PREVIEW_SUGGESTIONS_ACCEPTED',
     headingTextIncluded: INCLUDE_HEADING_TEXT,
+    currentTabWordCount: currentTabWords,
+    currentTabWordCountScope: 'Current tab only; includes heading text and introductory text',
     documentWordCount: documentWords,
     documentWordCountScope: 'All tabs; includes heading text and introductory text',
     headings: nestedHeadings
@@ -157,12 +168,25 @@ function showHeadingWordCounts() {
     })
   ).join('\n');
 
+  // Keep CSV rectangular and distinguish tab/document totals from headings.
+  const csvRows = [
+    ['Scope', 'Tab', 'Level', 'Heading', 'Words'],
+    ['Tab', tab.getTitle(), '', 'Current tab', currentTabWords],
+    ['Document', '', '', 'Entire document (all tabs)', documentWords]
+  ].concat(headings.map(function (heading) {
+    return ['Heading', tab.getTitle(), 'H' + heading.level, heading.title, heading.words];
+  }));
+  const csv = csvRows.map(function (row) {
+    return row.map(escapeWordCountCsv_).join(',');
+  }).join('\r\n');
+
   // Serialize as data, escaping characters that could terminate an HTML script.
   const formats = JSON.stringify({
     text: { content: report, extension: 'txt', mime: 'text/plain' },
     markdown: { content: markdown.join('\n'), extension: 'md', mime: 'text/markdown' },
     table: { content: tableContent, extension: 'tsv', mime: 'text/tab-separated-values',
       summary: summary, rows: headings },
+    csv: { content: csv, extension: 'csv', mime: 'text/csv' },
     json: { content: json, extension: 'json', mime: 'application/json' }
   }).replace(/</g, '\\u003c')
     .replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
@@ -182,6 +206,7 @@ function showHeadingWordCounts() {
       button { padding: 7px 12px; cursor: pointer; }
       button[aria-pressed="true"] { background: #e8f0fe; color: #174ea6;
         border: 2px solid #174ea6; }
+      button:disabled { cursor: default; }
       #tableResults { flex: 1; min-height: 200px; overflow: auto;
         border: 1px solid #888; padding: 12px; }
       #tableSummary { white-space: pre-wrap; margin-bottom: 16px; }
@@ -196,7 +221,7 @@ function showHeadingWordCounts() {
         box-shadow: 0 2px 8px #0003; }
     </style></head><body>
       <p>Counts the preview with all suggestions accepted. Document unchanged.<br>
-      Click a format to display and copy it. Table copies as tab-separated text.</p>
+      Choose a format, then copy or download it. Table copies as tab-separated text.</p>
       <textarea id="results" aria-label="Heading word counts" readonly></textarea>
       <div id="tableResults" hidden>
         <p id="tableSummary"></p>
@@ -208,12 +233,14 @@ function showHeadingWordCounts() {
         <p id="emptyTable" hidden>No H1–H6 headings found.</p>
       </div>
       <div class="buttons" role="group" aria-label="Report format">
-        <button data-format="text" onclick="showFormat('text', true)">Plain text</button>
-        <button data-format="markdown" onclick="showFormat('markdown', true)">Markdown</button>
-        <button data-format="table" onclick="showFormat('table', true)">Table</button>
-        <button data-format="json" onclick="showFormat('json', true)">JSON</button>
+        <button data-format="text" onclick="showFormat('text')">Plain text</button>
+        <button data-format="markdown" onclick="showFormat('markdown')">Markdown</button>
+        <button data-format="table" onclick="showFormat('table')">Table</button>
+        <button data-format="csv" onclick="showFormat('csv')">CSV</button>
+        <button data-format="json" onclick="showFormat('json')">JSON</button>
       </div>
       <div class="buttons">
+        <button id="copy" onclick="copyReport()">Copy to clipboard</button>
         <button id="download" onclick="downloadReport()">Download .txt</button>
       </div>
       <div id="toast" role="status" aria-live="polite" hidden></div>
@@ -223,7 +250,7 @@ function showHeadingWordCounts() {
         let toastTimer;
         let copySequence = 0;
 
-        function showFormat(name, copy) {
+        function showFormat(name) {
           currentFormat = name;
           const results = document.getElementById('results');
           results.value = formats[name].content;
@@ -231,12 +258,11 @@ function showHeadingWordCounts() {
           document.getElementById('tableResults').hidden = name !== 'table';
           document.querySelectorAll('[data-format]').forEach(function (button) {
             const selected = button.dataset.format === name;
+            button.disabled = selected;
             button.setAttribute('aria-pressed', String(selected));
           });
           document.getElementById('download').textContent =
             'Download .' + formats[name].extension;
-          // Keep the selected format clickable so it can be copied again.
-          if (copy) copyReport();
         }
 
         function showToast(message, duration) {
@@ -317,7 +343,7 @@ function showHeadingWordCounts() {
           tableRows.appendChild(row);
         });
         document.getElementById('emptyTable').hidden = formats.table.rows.length > 0;
-        showFormat('text', false);
+        showFormat('text');
       </script>
     </body></html>
   `).setWidth(720).setHeight(560);
@@ -329,6 +355,10 @@ function escapeWordCountMarkdown_(value) {
   return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;')
     .replace(/>/g, '&gt;').replace(/[\\`*_{}\[\]()#+.!|>-]/g, '\\$&')
     .replace(/[\r\n]+/g, ' ');
+}
+
+function escapeWordCountCsv_(value) {
+  return '"' + String(value).replace(/"/g, '""') + '"';
 }
 
 function findPreviewTab_(tabs, tabId) {
