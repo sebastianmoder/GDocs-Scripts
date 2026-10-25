@@ -1,33 +1,35 @@
 /**
-* APA 7 statistical notation cleanup for Google Docs.
-*
-* Fresh script.
-* Does NOT repair damage from prior faulty versions.
-* Does NOT use Text.replaceText().
-* Does NOT use whole-paragraph setText().
-*
-* Intended functions:
-* 1. Add non-breaking spaces around comparison operators:
-*    =, >, <, ≥, ≤
-*
-* 2. Convert >= and <= to ≥ and ≤.
-*
-* 3. Italicize selected Latin statistical symbols before operators:
-*    p, ps, r, R, R2, t, F, z, M, SD, SE, b, B, d, df, k, n, N
-*
-* 4. Format:
-*    R2 / R² / R^2       -> italic R + superscript 2
-*    χ2 / χ² / χ^2       -> roman χ + superscript 2
-*    ηp2 / ηp² / ηp^2
-*    η_p2 / η_p² / η_p^2 -> roman η + subscript p + superscript 2
-*    Any remaining ² glyph -> roman superscript 2, regardless of the symbol.
-*
-* 5. Convert hyphen-minus in negative numeric values to a true minus sign:
-*    -.04  -> −.04
-*    -24.3 -> −24.3
-*
-* Run on a clean copy of the manuscript.
-*/
+ * Applies APA 7 statistical notation cleanup to the active Google Docs tab.
+ *
+ * SCOPE:
+ * Run from a document-bound project. Processes body text, including paragraphs,
+ * lists, and tables; excludes headers, footers, footnotes, and other tabs.
+ * Matches are processed within individual text elements.
+ *
+ * SPACING AND SIGNS:
+ * - Places one non-breaking space on each side of =, >, <, ≥, and ≤ throughout
+ *   the processed text, and converts >= and <= to ≥ and ≤.
+ * - Converts hyphen-minus before negative numbers to a true minus sign
+ *   (e.g., -.04 becomes −.04), leaving numeric ranges such as 12-24 unchanged.
+ * - Replaces whitespace after commas before digits in t(...) and F(...)
+ *   degrees-of-freedom expressions with a single non-breaking space.
+ *
+ * SYMBOL FORMATTING:
+ * - Italicizes p, r, R, t, F, z, M, SD, SE, b, B, d, df, k, n, and N before
+ *   comparison operators, with or without surrounding parentheses. For ps,
+ *   italicizes only p and makes s roman. Also italicizes t and F before "(".
+ * - Formats R2 / R² / R^2 as italic R with a roman superscript 2, and resets
+ *   immediately following spaces and comparison operators to roman baseline.
+ * - Formats χ2 / χ² / χ^2 as roman χ with a roman superscript 2.
+ * - Formats ηp2 / ηp² / ηp^2 (also with η_p) as roman η, roman subscript p,
+ *   and roman superscript 2.
+ * - Converts every remaining ² glyph to a roman superscript 2, regardless of
+ *   the preceding symbol.
+ *
+ * Makes local text replacements and formatting changes, preserving surrounding
+ * rich text. Replacement text inherits the first replaced character's attributes
+ * before the notation-specific formatting is applied. Alerts when complete.
+ */
 
 
 function tidyApaStatNotation() {
