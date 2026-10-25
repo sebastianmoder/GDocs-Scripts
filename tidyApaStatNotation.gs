@@ -13,7 +13,7 @@
 * 2. Convert >= and <= to ≥ and ≤.
 *
 * 3. Italicize selected Latin statistical symbols before operators:
-*    p, ps, r, R, R2, t, F, z, M, SD, SE, b, B, d, df, n, N
+*    p, ps, r, R, R2, t, F, z, M, SD, SE, b, B, d, df, k, n, N
 *
 * 4. Format:
 *    R2 / R² / R^2       -> italic R + superscript 2
@@ -353,6 +353,7 @@ function normalizeDfCommaSpaces_(textElement) {
 * r = .26        -> r italic
 * M = 4.21       -> M italic
 * SD = 1.03      -> SD italic
+* (k = 2)        -> k italic (parentheses are optional)
 * adjusted R2 = .03 -> R and 2 italic, 2 superscript
 */
 function italicizeStatSymbolsBeforeOperators_(textElement) {
@@ -382,6 +383,7 @@ function italicizeStatSymbolsBeforeOperators_(textElement) {
         { regex: new RegExp("\\bb(?=" + space + op + space + ")", "g"), italicStart: 0, italicLength: 1 },
         { regex: new RegExp("\\bB(?=" + space + op + space + ")", "g"), italicStart: 0, italicLength: 1 },
         { regex: new RegExp("\\bd(?=" + space + op + space + ")", "g"), italicStart: 0, italicLength: 1 },
+        { regex: new RegExp("\\bk(?=" + space + op + space + ")", "g"), italicStart: 0, italicLength: 1 },
         { regex: new RegExp("\\bn(?=" + space + op + space + ")", "g"), italicStart: 0, italicLength: 1 },
         { regex: new RegExp("\\bN(?=" + space + op + space + ")", "g"), italicStart: 0, italicLength: 1 }
     ];
