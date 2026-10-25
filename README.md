@@ -14,7 +14,7 @@ All `.addItem(...)` lines are commented out by default. Uncomment the line for e
 
 - `Count words by heading` runs `showHeadingWordCounts` from `showHeadingWordCounts.gs`.
 - `Tidy APA statistical notation` runs `tidyApaStatNotation` from `tidyApaStatNotation.gs`.
-- `Highlight references…` runs `showHighlightOptions` from `highlightCitations.gs`.
+- `Highlight references…` runs `highlightReferences` from `highlightReferences.gs`.
 
 Save the project and reload the Google Doc to display the enabled menu items. Keep only one `onOpen()` function in the project; if you already have one, merge the menu setup into it. You can also run any utility directly from the Apps Script editor without importing the menu template.
 
@@ -45,9 +45,9 @@ The report includes:
 
 Counts use a preview with all suggestions accepted. The script never changes the document or accepts or rejects suggestions. Section counts exclude heading text by default; set `INCLUDE_HEADING_TEXT` to `true` in `showHeadingWordCounts()` to include it. Tab and document totals always include headings and text before the first heading.
 
-### `highlightCitations.gs`
+### `highlightReferences.gs`
 
-Run `showHighlightOptions` to open a dialog with three independently selectable categories. Citations are selected initially. The highlighter, dialog HTML, and all helpers are contained in **one `.gs` file**: you can paste only `highlightCitations.gs` into a document-bound project and run it from the editor. The menu template is optional. No advanced Google Docs API service is required.
+Run `highlightReferences` to open a dialog with three independently selectable categories. Citations are selected initially. The highlighter, dialog HTML, and all helpers are contained in **one `.gs` file**: you can paste only `highlightReferences.gs` into a document-bound project and run it from the editor. The menu template is optional. No advanced Google Docs API service is required.
 
 | Category | Color | Examples |
 | --- | --- | --- |

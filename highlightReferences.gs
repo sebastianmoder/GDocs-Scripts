@@ -11,7 +11,7 @@ const REFERENCE_HIGHLIGHT_COLORS = {
     pages: '#FFD1E8'
 };
 
-function showHighlightOptions() {
+function highlightReferences() {
     const colors = REFERENCE_HIGHLIGHT_COLORS;
     const html = HtmlService.createHtmlOutput(`
     <!doctype html>
