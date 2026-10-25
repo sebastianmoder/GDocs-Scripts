@@ -125,19 +125,44 @@ function showHeadingWordCounts() {
   }));
   if (!headings.length) markdown.push('', 'No H1–H6 headings found.');
 
+  const nestedHeadings = [];
+  const parentHeadings = [];
+  headings.forEach(function (heading) {
+    const node = {
+      level: heading.level, title: heading.title, words: heading.words, children: []
+    };
+    while (parentHeadings.length &&
+           parentHeadings[parentHeadings.length - 1].level >= node.level) {
+      parentHeadings.pop();
+    }
+    const siblings = parentHeadings.length ?
+      parentHeadings[parentHeadings.length - 1].children : nestedHeadings;
+    siblings.push(node);
+    parentHeadings.push(node);
+  });
+
   const json = JSON.stringify({
     tab: { id: tab.getId(), title: tab.getTitle() },
     suggestionsViewMode: 'PREVIEW_SUGGESTIONS_ACCEPTED',
     headingTextIncluded: INCLUDE_HEADING_TEXT,
     documentWordCount: documentWords,
     documentWordCountScope: 'All tabs; includes heading text and introductory text',
-    headings: headings
+    headings: nestedHeadings
   }, null, 2);
+
+  const summary = report.slice(0, report.indexOf('\n\nLevel\tHeading\tWords'));
+  const tableContent = summary + '\n\n' + ['Level\tHeading\tWords'].concat(
+    headings.map(function (heading) {
+      return ['H' + heading.level, heading.title, heading.words].join('\t');
+    })
+  ).join('\n');
 
   // Serialize as data, escaping characters that could terminate an HTML script.
   const formats = JSON.stringify({
     text: { content: report, extension: 'txt', mime: 'text/plain' },
     markdown: { content: markdown.join('\n'), extension: 'md', mime: 'text/markdown' },
+    table: { content: tableContent, extension: 'tsv', mime: 'text/tab-separated-values',
+      summary: summary, rows: headings },
     json: { content: json, extension: 'json', mime: 'application/json' }
   }).replace(/</g, '\\u003c')
     .replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
@@ -155,35 +180,115 @@ function showHeadingWordCounts() {
         font: 13px monospace; white-space: pre; }
       .buttons { display: flex; gap: 8px; flex-wrap: wrap; }
       button { padding: 7px 12px; cursor: pointer; }
-      button:disabled { cursor: default; opacity: 0.55; }
+      button[aria-pressed="true"] { background: #e8f0fe; color: #174ea6;
+        border: 2px solid #174ea6; }
+      #tableResults { flex: 1; min-height: 200px; overflow: auto;
+        border: 1px solid #888; padding: 12px; }
+      #tableSummary { white-space: pre-wrap; margin-bottom: 16px; }
+      table { width: 100%; border-collapse: collapse; }
+      th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+      th { background: #f5f5f5; }
+      td:last-child, th:last-child { text-align: right; }
+      [hidden] { display: none !important; }
+      #toast { position: fixed; bottom: 76px; left: 50%;
+        transform: translateX(-50%); background: #263238; color: white;
+        border-radius: 6px; padding: 10px 16px; pointer-events: none;
+        box-shadow: 0 2px 8px #0003; }
     </style></head><body>
       <p>Counts the preview with all suggestions accepted. Document unchanged.<br>
-      Select the results, then press Ctrl+C or ⌘C.</p>
+      Click a format to display and copy it. Table copies as tab-separated text.</p>
       <textarea id="results" aria-label="Heading word counts" readonly></textarea>
+      <div id="tableResults" hidden>
+        <p id="tableSummary"></p>
+        <table aria-label="Heading word counts">
+          <thead><tr><th scope="col">Level</th><th scope="col">Heading</th>
+          <th scope="col">Words</th></tr></thead>
+          <tbody id="tableRows"></tbody>
+        </table>
+        <p id="emptyTable" hidden>No H1–H6 headings found.</p>
+      </div>
       <div class="buttons" role="group" aria-label="Report format">
-        <button data-format="text" onclick="showFormat('text')" disabled>Plain text</button>
-        <button data-format="markdown" onclick="showFormat('markdown')">Markdown table</button>
-        <button data-format="json" onclick="showFormat('json')">JSON</button>
+        <button data-format="text" onclick="showFormat('text', true)">Plain text</button>
+        <button data-format="markdown" onclick="showFormat('markdown', true)">Markdown</button>
+        <button data-format="table" onclick="showFormat('table', true)">Table</button>
+        <button data-format="json" onclick="showFormat('json', true)">JSON</button>
       </div>
       <div class="buttons">
-        <button onclick="document.getElementById('results').select()">Select all</button>
         <button id="download" onclick="downloadReport()">Download .txt</button>
-        <button onclick="google.script.host.close()">Close</button>
       </div>
+      <div id="toast" role="status" aria-live="polite" hidden></div>
       <script>
         const formats = ${formats};
         let currentFormat = 'text';
+        let toastTimer;
+        let copySequence = 0;
 
-        function showFormat(name) {
+        function showFormat(name, copy) {
           currentFormat = name;
-          document.getElementById('results').value = formats[name].content;
+          const results = document.getElementById('results');
+          results.value = formats[name].content;
+          results.hidden = name === 'table';
+          document.getElementById('tableResults').hidden = name !== 'table';
           document.querySelectorAll('[data-format]').forEach(function (button) {
             const selected = button.dataset.format === name;
-            button.disabled = selected;
             button.setAttribute('aria-pressed', String(selected));
           });
           document.getElementById('download').textContent =
             'Download .' + formats[name].extension;
+          // Keep the selected format clickable so it can be copied again.
+          if (copy) copyReport();
+        }
+
+        function showToast(message, duration) {
+          const toast = document.getElementById('toast');
+          clearTimeout(toastTimer);
+          toast.textContent = message;
+          toast.hidden = false;
+          toastTimer = setTimeout(function () { toast.hidden = true; }, duration);
+        }
+
+        async function copyReport() {
+          const sequence = ++copySequence;
+          const text = formats[currentFormat].content;
+          const previousFocus = document.activeElement;
+          const helper = document.createElement('textarea');
+          helper.value = text;
+          helper.readOnly = true;
+          helper.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0';
+          document.body.appendChild(helper);
+          helper.focus();
+          helper.select();
+          let copied = false;
+          try {
+            // Synchronous copying works in dialogs where the newer clipboard
+            // API is blocked by the surrounding iframe's permissions policy.
+            copied = document.execCommand('copy');
+          } catch (error) {
+            copied = false;
+          } finally {
+            helper.remove();
+            if (previousFocus) previousFocus.focus({ preventScroll: true });
+          }
+          if (!copied && navigator.clipboard && navigator.clipboard.writeText) {
+            try {
+              await navigator.clipboard.writeText(text);
+              copied = true;
+            } catch (error) {
+              copied = false;
+            }
+          }
+          if (sequence !== copySequence) return;
+          if (copied) {
+            showToast('Copied to clipboard', 1000);
+          } else {
+            // Provide selectable text even if the browser denies clipboard access.
+            document.getElementById('tableResults').hidden = true;
+            const results = document.getElementById('results');
+            results.hidden = false;
+            results.focus();
+            results.select();
+            showToast('Copy blocked. Press Ctrl+C or ⌘C to copy the selected text.', 4000);
+          }
         }
 
         function downloadReport() {
@@ -199,7 +304,20 @@ function showHeadingWordCounts() {
           setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
         }
 
-        showFormat('text');
+        document.getElementById('tableSummary').textContent = formats.table.summary;
+        const tableRows = document.getElementById('tableRows');
+        formats.table.rows.forEach(function (heading) {
+          const row = document.createElement('tr');
+          ['H' + heading.level, heading.title, heading.words].forEach(function (value, index) {
+            const cell = document.createElement('td');
+            cell.textContent = value;
+            if (index === 1) cell.style.paddingLeft = (8 + 12 * (heading.level - 1)) + 'px';
+            row.appendChild(cell);
+          });
+          tableRows.appendChild(row);
+        });
+        document.getElementById('emptyTable').hidden = formats.table.rows.length > 0;
+        showFormat('text', false);
       </script>
     </body></html>
   `).setWidth(720).setHeight(560);
