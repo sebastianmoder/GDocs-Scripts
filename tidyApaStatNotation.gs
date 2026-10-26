@@ -39,8 +39,10 @@ function tidyApaStatNotation(confirmed) {
     showApaStatConfirmation_();
     return;
   }
-  const body = DocumentApp.getActiveDocument().getBody();
-  processElement_(body);
+  const document = DocumentApp.getActiveDocument();
+  const tab = document && document.getActiveTab();
+  if (!tab) throw new Error('Open an editable Google Doc and run APA cleanup from Extensions.');
+  processElement_(tab.asDocumentTab().getBody());
 }
 
 function showApaStatConfirmation_() {
@@ -84,7 +86,11 @@ function showApaStatConfirmation_() {
           google.script.run.withSuccessHandler(function() {
             finish("APA statistical notation cleanup complete.");
           }).withFailureHandler(function(error) {
-            finish("Cleanup failed: " + error.message);
+            status.textContent = "Cleanup failed: " + error.message +
+              " Some edits may have completed. Check the document or use Undo before trying again. " +
+              "If access was denied, reopen the tool from Extensions and allow the requested permissions.";
+            run.disabled = cancel.disabled = false;
+            run.focus();
           }).tidyApaStatNotation(true);
         });
       </script>
@@ -425,8 +431,4 @@ function replaceRangePreservingStyle_(textElement, start, end, replacement) {
     textElement.insertText(position, inserted);
     textElement.setAttributes(position, position + inserted.length - 1, attrs);
   }
-}
-
-function logText_(textElement) {
-  Logger.log(textElement.getText());
 }
