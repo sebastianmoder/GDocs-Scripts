@@ -20,7 +20,9 @@ Save the project and reload the Google Doc to display the enabled menu items. Ke
 
 ### `tidyApaStatNotation.gs`
 
-The script is designed for APA 7 statistical notation cleanup in manuscript drafts. It:
+The script is designed for APA 7 statistical notation cleanup in manuscript drafts. Running it first opens a short confirmation dialog explaining that it changes document text and formatting. Click **Confirm & run** to start, or the red **Cancel** button to close without changes. The dialog reports completion or any error.
+
+It:
 
 - adds non-breaking spaces around `=`, `>`, `<`, `≥`, `≤`, `≠`, `≈`, and `±`; converts `>=`, `<=`, and `!=` to symbols
 - spaces binary `+` and `−` between recognized numeric/statistical operands; converts hyphen subtraction involving a known statistic (such as `n-1`) while preserving numeric hyphen ranges such as `12-24`

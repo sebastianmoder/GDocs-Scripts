@@ -34,10 +34,63 @@ const APA_LATIN_STATS_ = [
 const APA_GREEK_STATS_ = "αβγδΔεηθκλμνξπρσΣτφΦχψωΩ";
 const APA_HORIZONTAL_SPACE_ = "[ \\t\\u00A0\\u202F]";
 
-function tidyApaStatNotation() {
+function tidyApaStatNotation(confirmed) {
+  if (confirmed !== true) {
+    showApaStatConfirmation_();
+    return;
+  }
   const body = DocumentApp.getActiveDocument().getBody();
   processElement_(body);
-  DocumentApp.getUi().alert("APA statistical notation cleanup complete.");
+}
+
+function showApaStatConfirmation_() {
+  const html = HtmlService.createHtmlOutput(`
+    <!doctype html>
+    <html><head><base target="_top"><style>
+      body { font: 14px Arial, sans-serif; color: #202124; padding: 12px; }
+      p { line-height: 1.5; margin: 0 0 20px; }
+      .actions { display: flex; justify-content: flex-end; gap: 8px; }
+      button { padding: 9px 16px; border: 0; border-radius: 4px;
+        background: #1a73e8; color: #fff; font: inherit; cursor: pointer; }
+      #cancel { background: #b3261e; }
+      #cancel:hover:not(:disabled) { background: #8c1d18; }
+      button:focus-visible { outline: 2px solid #202124; outline-offset: 3px; }
+      button:disabled { opacity: 0.55; cursor: default; }
+    </style></head><body>
+      <p id="status" role="status" aria-live="polite">This script will change text
+        and statistical formatting in the active tab of your document.</p>
+      <div class="actions">
+        <button id="cancel" type="button" autofocus>Cancel</button>
+        <button id="run" type="button">Confirm &amp; run</button>
+        <button id="close" type="button" hidden>Close</button>
+      </div>
+      <script>
+        const status = document.getElementById("status");
+        const cancel = document.getElementById("cancel");
+        const run = document.getElementById("run");
+        const close = document.getElementById("close");
+        cancel.addEventListener("click", function() { google.script.host.close(); });
+        close.addEventListener("click", function() { google.script.host.close(); });
+        function finish(message) {
+          status.textContent = message;
+          run.hidden = cancel.hidden = true;
+          close.hidden = false;
+          close.focus();
+        }
+        run.addEventListener("click", function() {
+          if (run.disabled) return;
+          run.disabled = cancel.disabled = true;
+          status.textContent = "Cleaning up APA statistical notation…";
+          google.script.run.withSuccessHandler(function() {
+            finish("APA statistical notation cleanup complete.");
+          }).withFailureHandler(function(error) {
+            finish("Cleanup failed: " + error.message);
+          }).tidyApaStatNotation(true);
+        });
+      </script>
+    </body></html>
+  `).setWidth(420).setHeight(180);
+  DocumentApp.getUi().showModalDialog(html, "Confirm APA cleanup");
 }
 
 function processElement_(element, isTableLabel) {
