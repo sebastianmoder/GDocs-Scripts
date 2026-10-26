@@ -89,7 +89,7 @@ function showApaStatConfirmation_() {
         });
       </script>
     </body></html>
-  `).setWidth(420).setHeight(180);
+  `).setWidth(420).setHeight(240);
   DocumentApp.getUi().showModalDialog(html, "Confirm APA cleanup");
 }
 
