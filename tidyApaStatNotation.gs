@@ -58,7 +58,7 @@ function showApaStatConfirmation_() {
       button:disabled { opacity: 0.55; cursor: default; }
     </style></head><body>
       <p id="status" role="status" aria-live="polite">This script will change text
-        and statistical formatting in the active tab of your document.</p>
+        and statistical formatting in the active tab of your document.</p><p>It might be wise to test-run this script on a duplicate copy first.</p>
       <div class="actions">
         <button id="cancel" type="button" autofocus>Cancel</button>
         <button id="run" type="button">Confirm &amp; run</button>
