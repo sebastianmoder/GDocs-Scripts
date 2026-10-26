@@ -26,8 +26,9 @@
  * Does not change numerical precision, leading zeros, or reported values.
  */
 
+// IQR follows APA 7 §6.44's general symbol rule, not an explicit IQR entry.
 const APA_LATIN_STATS_ = [
-  "Mdn", "MSE", "SSE", "SD", "SE", "MS", "SS", "OR", "df",
+  "Mdn", "MSE", "SSE", "IQR", "SD", "SE", "MS", "SS", "OR", "df",
   "p", "r", "R", "t", "F", "z", "M", "b", "B", "d", "g", "f",
   "s", "k", "n", "N", "U", "W", "H", "Q", "D", "V"
 ];

@@ -30,12 +30,14 @@ It:
 - formats squared `R`, `r`, `f`, `s`, `k`, `I`, `T`, `χ`, `η`, `ω`, `ε`, and `σ`, accepting plain `2`, `²`, and `^2` forms; Latin bases are italic, Greek bases are roman, and the exponent is roman superscript
 - formats partial/generalized eta squared (`η_p^2`, `η_g²`, also without underscores), correlations (`r_s`, `r_pb`, `r_tb`, also `rₛ`), and Bayes factors (`BF10`, `BF01`, also underscore or Unicode subscript forms); identifying subscripts are roman
 - converts every remaining `²` glyph in processed body text to a regular `2` with superscript formatting
-- italicizes Latin statistics in expressions, including `Mdn`, `MS`, `MSE`, `SSE`, `SS`, `U`, `W`, `H`, `Q`, `D`, `V`, `g`, `f`, `s`, and `OR`, alongside the original symbols; plural suffixes such as those in `Ms`, `SDs`, and `rs` remain roman
+- italicizes Latin statistics in expressions, including `IQR`, `Mdn`, `MS`, `MSE`, `SSE`, `SS`, `U`, `W`, `H`, `Q`, `D`, `V`, `g`, `f`, `s`, and `OR`, alongside the original symbols; plural suffixes such as those in `Ms`, `SDs`, and `rs` remain roman
 - recognizes phrases such as `Cohen’s d`, `Hedges’ g`, `p values`, `t-test`, and `z scores`, and standalone statistical labels occupying a whole table cell
 - makes standalone Greek statistical letters roman
 - removes spaces before numeric degrees-of-freedom parentheses (`t (42)` → `t(42)`, `F (2,145)` → `F(2, 145)`) and inserts one non-breaking space after each df comma, including when no space existed
 
 Matching does not span text elements. Standalone Latin letters in ordinary prose are left alone. Whole-cell statistical labels are recognized by their text, without inferring a table's structure or meaning. Reverse italics in italicized titles are not inferred automatically. Numerical values, leading zeros, and precision are unchanged.
+
+`IQR` is treated as a statistical symbol in expressions such as `IQR = 12` and whole-cell table labels. This applies APA 7 §6.44's general distinction between abbreviations and numerical symbols, consistent with [APA's guidance on italics](https://apastyle.apa.org/style-grammar-guidelines/italics-quotations/italics); APA does not explicitly list IQR in Table 6.5. An introduction such as `interquartile range (IQR)` is left unchanged.
 
 Visible URLs and all hyperlink text are excluded from cleanup: their characters, link targets, and formatting remain unchanged. This includes URLs with schemes, `www.` addresses, and bare domains with paths or query parameters. Visible URL tails are conservatively protected through the next whitespace or quotation mark, including closing punctuation. Statistical notation before and after these protected spans is still processed.
 
@@ -51,6 +53,7 @@ For manual validation in a duplicate Doc, check the following; spaces beside ope
 | --- | --- |
 | `t (42)=2.10; F (2,145)=4.2` | `t(42) = 2.10; F(2, 145) = 4.2`, with italic test symbols |
 | `Mdn=.5; U=15; OR=2.1; SDs>.1` | Spaced operators, italic statistics, roman plural `s` |
+| `IQR=12; interquartile range (IQR)` and a whole-cell `IQR` label | Expression and table-label `IQR` become italic; the prose abbreviation stays unchanged |
 | `r^2=.2; f²=.15; ω2=.1` | Superscript exponents; italic `r`/`f`, roman `ω` |
 | `η_g^2=.1; r_pb=.3; BF_10=4` | Roman identifying subscripts, superscript eta exponent, italic Latin bases |
 | `p!=.05; b≈-.04; M±SD; n-1; 12-24` | `p ≠ .05; b ≈ −.04; M ± SD; n − 1; 12-24` |

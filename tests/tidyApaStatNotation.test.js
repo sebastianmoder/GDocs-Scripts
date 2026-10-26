@@ -87,10 +87,10 @@ function aligned(text, token, offset, value) {
   assert.equal(text.attrs[text.value.indexOf(token) + offset].alignment, value, token);
 }
 
-for (const symbol of ["Mdn", "s", "MS", "MSE", "SSE", "SS", "U", "W", "H", "Q", "g", "f", "OR", "p", "df", "SD", "SE", "b", "N"]) {
+for (const symbol of ["IQR", "Mdn", "s", "MS", "MSE", "SSE", "SS", "U", "W", "H", "Q", "g", "f", "OR", "p", "df", "SD", "SE", "b", "N"]) {
   check(`${symbol}=.50`, `${symbol}${nb}=${nb}.50`, text => italicToken(text, symbol));
 }
-for (const symbol of ["Ms", "SDs", "SEs", "rs", "ts", "Fs", "ps", "ns", "Ns"]) {
+for (const symbol of ["IQRs", "Ms", "SDs", "SEs", "rs", "ts", "Fs", "ps", "ns", "Ns"]) {
   check(`${symbol}≥.10`, `${symbol}${nb}≥${nb}.10`, text => {
     italicToken(text, symbol.slice(0, -1));
     assert.equal(text.attrs[symbol.length - 1].italic, false);
@@ -156,6 +156,11 @@ check("α=.8; β=.3; κ=.7; ρ=.4", `α${nb}=${nb}.8; β${nb}=${nb}.3; κ${nb}=$
 check("cm²", "cm2", text => aligned(text, "cm2", 2, "super"));
 check("M", "M", text => italicToken(text, "M", false));
 check(" SD ", " SD ", text => italicToken(text, "SD"), true);
+check("interquartile range (IQR); IQR describes spread; preIQR; IQRscale",
+  "interquartile range (IQR); IQR describes spread; preIQR; IQRscale", text => {
+    assert(text.attrs.every(a => !a.italic));
+  });
+check("IQR-1", `IQR${nb}−${nb}1`, text => italicToken(text, "IQR"));
 check("\np=.05\np=.10\n", `\np${nb}=${nb}.05\np${nb}=${nb}.10\n`);
 check("📊 t (42)=2.1; résumé; η_g^2=.1", `📊 t(42)${nb}=${nb}2.1; résumé; ηg2${nb}=${nb}.1`,
   text => { italicToken(text, "t"); aligned(text, "ηg2", 1, "sub"); });
@@ -254,11 +259,14 @@ function container(type, children) {
   };
 }
 const heading = new MockText("SD");
+const iqrHeading = new MockText("IQR");
 const prose = new MockText("SD is an abbreviation");
 const bodyLetter = new MockText("M");
-const tree = container("body", [container("cell", [heading]), container("cell", [prose]), bodyLetter]);
+const tree = container("body", [container("cell", [heading]), container("cell", [iqrHeading]),
+  container("cell", [prose]), bodyLetter]);
 context.processElement_(tree);
 italicToken(heading, "SD");
+italicToken(iqrHeading, "IQR");
 italicToken(prose, "SD", false);
 italicToken(bodyLetter, "M", false);
 console.log(`Passed ${cases} notation cases, rerun checks, rich-text preservation, and table traversal.`);
